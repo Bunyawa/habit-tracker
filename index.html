@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="th" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HabitFlow — แดชบอร์ดติดตามนิสัยและเป้าหมายรายวัน</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Prompt for clean modern Thai & Plus Jakarta Sans for numbers -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Prompt', 'Plus Jakarta Sans', 'sans-serif'],
+                        num: ['Plus Jakarta Sans', 'Prompt', 'sans-serif']
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .font-num {
+            font-family: 'Plus Jakarta Sans', 'Prompt', sans-serif;
+        }
+        /* Custom Smooth Animations */
+        @keyframes popCheck {
+            0% { transform: scale(0.8); }
+            50% { transform: scale(1.18); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: popCheck 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes floatFlame {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-2px) scale(1.08); }
+        }
+        .flame-pulse {
+            animation: floatFlame 2s ease-in-out infinite;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.7);
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen transition-colors duration-300 selection:bg-indigo-500 selection:text-white">
+
+    <!-- Confetti Canvas Overlay -->
+    <canvas id="confettiCanvas" class="fixed inset-0 pointer-events-none z-50"></canvas>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-30 backdrop-blur-xl bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/80 dark:border-slate-800/80 transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+            <!-- Brand Title -->
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
+                    <i class="ph-fill ph-check-square-offset text-2xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
+                            HabitFlow
+                        </h1>
+                        <span id="userLevelBadge" class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
+                            🌟 เลเวล 4 นักสร้างวินัย
+                        </span>
+                    </div>
+                    <p id="currentDateText" class="text-xs text-slate-500 dark:text-slate-400">
+                        วันพุธที่ 14 ตุลาคม 2569 • สัปดาห์ปัจจุบัน
+                    </p>
+                </div>
+            </div>
+
+            <!-- Action Controls -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Week Switcher -->
+                <div class="hidden md:flex items-center bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                    <button onclick="changeWeekOffset(-1)" id="btnPrevWeek" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition flex items-center gap-1">
+                        <i class="ph-bold ph-caret-left"></i> สัปดาห์ก่อน
+                    </button>
+                    <span id="weekLabel" class="px-3 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                        12 - 18 ต.ค.
+                    </span>
+                    <button onclick="changeWeekOffset(0)" id="btnCurrWeek" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm transition">
+                        สัปดาห์นี้
+                    </button>
+                </div>
+
+                <!-- Sound Effect Toggle -->
+                <button onclick="toggleSound()" id="soundToggleBtn" title="เปิด/ปิดเสียงเอฟเฟกต์" class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition">
+                    <i id="soundIcon" class="ph-fill ph-speaker-high text-lg"></i>
+                </button>
+
+                <!-- Dark Mode Toggle -->
+                <button onclick="toggleTheme()" id="themeToggleBtn" title="สลับโหมดมืด/สว่าง" class="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition">
+                    <i id="themeIcon" class="ph-fill ph-moon text-lg"></i>
+                </button>
+
+                <!-- Add New Habit Button -->
+                <button onclick="openHabitModal()" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-medium text-sm shadow-md shadow-indigo-500/20 flex items-center gap-2 transition">
+                    <i class="ph-bold ph-plus text-base"></i>
+                    <span>เพิ่มเป้าหมายใหม่</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Top 4 KPI Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Card 1: Today's Completion -->
+            <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden group">
+                <div class="space-y-1 z-10">
+                    <span class="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        เป้าหมายวันนี้ (<span id="todayNameLabel">วันพุธ</span>)
+                    </span>
+                    <div class="flex items-baseline gap-2">
+                        <h2 id="kpiTodayCount" class="text-3xl font-extrabold font-num text-slate-800 dark:text-white">0/0</h2>
+                        <span id="kpiTodayPercent" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300">0%</span>
+                    </div>
+                    <p id="kpiTodaySubtext" class="text-xs text-slate-500 dark:text-slate-400 pt-1">
+                        ทำต่อเนื่องเพื่อสะสมสถิติวันนี้!
+                    </p>
+                </div>
+                <!-- Circular Progress SVG -->
+                <div class="relative w-16 h-16 flex items-center justify-center shrink-0">
+                    <svg class="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                        <circle cx="32" cy="32" r="26" stroke="currentColor" stroke-width="6" fill="transparent" class="text-slate-100 dark:text-slate-800" />
+                        <circle id="todayRingCircle" cx="32" cy="32" r="26" stroke="currentColor" stroke-width="6" fill="transparent"
+                            stroke-dasharray="163.36" stroke-dashoffset="163.36" stroke-linecap="round"
+                            class="text-emerald-500 transition-all duration-700 ease-out" />
+                    </svg>
+                    <i id="todayRingIcon" class="ph-fill ph-check-fat text-emerald-500 text-xl absolute"></i>
+                </div>
+            </div>
+
+            <!-- Card 2: Best Active Streak -->
+            <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden">
+                <div class="space-y-1 z-10">
+                    <span class="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        สถิติต่อเนื่องสูงสุด (Streak)
+                    </span>
+                    <div class="flex items-baseline gap-1.5">
+                        <h2 id="kpiBestStreak" class="text-3xl font-extrabold font-num text-orange-500">0</h2>
+                        <span class="text-sm font-semibold text-slate-600 dark:text-slate-300">วันติดต่อกัน</span>
+                    </div>
+                    <p id="kpiBestStreakHabit" class="text-xs text-slate-500 dark:text-slate-400 pt-1 truncate max-w-[180px]">
+                        กำลังคำนวณสถิติ...
+                    </p>
+                </div>
+                <div class="w-14 h-14 rounded-2xl bg-orange-50 dark:bg-orange-950/50 border border-orange-200/60 dark:border-orange-800/40 flex items-center justify-center shrink-0">
+                    <span class="text-3xl flame-pulse">🔥</span>
+                </div>
+            </div>
+
+            <!-- Card 3: Weekly Completion Rate -->
+            <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden">
+                <div class="space-y-1 z-10 w-full pr-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">
+                            ความสำเร็จรายสัปดาห์
+                        </span>
+                        <span id="kpiWeeklyTrend" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-0.5">
+                            <i class="ph-bold ph-trend-up"></i> ดีเยี่ยม
+                        </span>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <h2 id="kpiWeeklyRate" class="text-3xl font-extrabold font-num text-indigo-600 dark:text-indigo-400">0%</h2>
+                        <span id="kpiWeeklyFraction" class="text-xs text-slate-500 dark:text-slate-400 font-num">(0/0 ครั้ง)</span>
+                    </div>
+                    <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden mt-2">
+                        <div id="kpiWeeklyBar" class="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/60 dark:border-indigo-800/40 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-400">
+                    <i class="ph-fill ph-chart-bar text-3xl"></i>
+                </div>
+            </div>
+
+            <!-- Card 4: Perfect Days & Consistency Score -->
+            <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between relative overflow-hidden">
+                <div class="space-y-1 z-10">
+                    <span class="text-xs font-medium text-slate-500 dark:text-slate-400">
+                        วันที่บรรลุเป้าหมายครบ (สัปดาห์นี้)
+                    </span>
+                    <div class="flex items-baseline gap-1.5">
+                        <h2 id="kpiPerfectDays" class="text-3xl font-extrabold font-num text-purple-600 dark:text-purple-400">0</h2>
+                        <span class="text-sm font-semibold text-slate-600 dark:text-slate-300">/ 7 วัน</span>
+                    </div>
+                    <p id="kpiScoreText" class="text-xs text-slate-500 dark:text-slate-400 pt-1">
+                        คะแนนวินัยสะสม: <strong class="text-slate-700 dark:text-slate-200 font-num">0 XP</strong>
+                    </p>
+                </div>
+                <div class="w-14 h-14 rounded-2xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200/60 dark:border-purple-800/40 flex items-center justify-center shrink-0 text-purple-600 dark:text-purple-400">
+                    <i class="ph-fill ph-trophy text-3xl"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content Grid: Habit Matrix + Weekly Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- Left/Main Column (8 cols): Interactive Habit Tracker Matrix -->
+            <section class="lg:col-span-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+                <!-- Matrix Header & Category Filters -->
+                <div class="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800/80 space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <i class="ph-fill ph-calendar-check text-indigo-500 text-xl"></i>
+                                ตารางบันทึกเป้าหมายรายวัน
+                            </h2>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                คลิกที่ช่องวันในสัปดาห์เพื่อเช็คสถานะการทำสำเร็จ แผนภูมิและสถิติจะอัปเดตทันที
+                            </p>
+                        </div>
+
+                        <!-- Quick Day Selector for Active "Today" Simulation -->
+                        <div class="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/70 px-3 py-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700">
+                            <span class="text-xs text-slate-500 dark:text-slate-400">เลือกวันปัจจุบัน:</span>
+                            <select id="activeDaySelect" onchange="changeActiveDay(this.value)" class="bg-transparent text-xs font-semibold text-indigo-600 dark:text-indigo-400 focus:outline-none cursor-pointer">
+                                <option value="0">วันจันทร์</option>
+                                <option value="1">วันอังคาร</option>
+                                <option value="2" selected>วันพุธ (วันนี้)</option>
+                                <option value="3">วันพฤหัสบดี</option>
+                                <option value="4">วันศุกร์</option>
+                                <option value="5">วันเสาร์</option>
+                                <option value="6">วันอาทิตย์</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Category Filter Pills & Quick Check All Today -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <div id="categoryFilterBar" class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                            <button onclick="setCategoryFilter('all')" data-cat="all" class="cat-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-indigo-600 text-white shadow-sm transition whitespace-nowrap">
+                                ทั้งหมด
+                            </button>
+                            <button onclick="setCategoryFilter('health')" data-cat="health" class="cat-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition whitespace-nowrap">
+                                💪 สุขภาพ
+                            </button>
+                            <button onclick="setCategoryFilter('work')" data-cat="work" class="cat-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition whitespace-nowrap">
+                                📚 การงาน/พัฒนาตนเอง
+                            </button>
+                            <button onclick="setCategoryFilter('mind')" data-cat="mind" class="cat-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition whitespace-nowrap">
+                                🧘 จิตใจ/สมาธิ
+                            </button>
+                            <button onclick="setCategoryFilter('finance')" data-cat="finance" class="cat-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition whitespace-nowrap">
+                                💰 การเงิน
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button onclick="checkAllToday()" class="text-xs font-medium px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/70 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 transition flex items-center gap-1">
+                                <i class="ph-bold ph-checks"></i> เช็คครบวันนี้
+                            </button>
+                            <button onclick="resetDemoData()" title="รีเซ็ตเป็นข้อมูลตัวอย่างเริ่มต้น" class="text-xs font-medium px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 transition flex items-center gap-1">
+                                <i class="ph-bold ph-arrow-counter-clockwise"></i> รีเซ็ตตัวอย่าง
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Habit Table Container -->
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left border-collapse min-w-[680px]">
+                        <thead>
+                            <tr id="habitTableHeaderRow" class="border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-800/40 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                <!-- Dynamically populated with day headers -->
+                            </tr>
+                        </thead>
+                        <tbody id="habitTableBody" class="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
+                            <!-- Dynamically populated habit rows -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Matrix Footer: Quick Templates Bar -->
+                <div class="p-4 bg-slate-50/70 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                            <i class="ph-fill ph-sparkle text-amber-500"></i> เพิ่มด่วน:
+                        </span>
+                        <button onclick="quickAddPreset('ดื่มน้ำสะอาด 8 แก้ว', '💧', 'health', 'sky', 7)" class="text-xs px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 transition">
+                            + 💧 ดื่มน้ำ 8 แก้ว
+                        </button>
+                        <button onclick="quickAddPreset('ฝึกภาษาอังกฤษ 20 นาที', '🇬🇧', 'work', 'indigo', 5)" class="text-xs px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 transition">
+                            + 🇬🇧 ฝึกภาษาอังกฤษ
+                        </button>
+                        <button onclick="quickAddPreset('งดน้ำตาล/ของหวาน', '🥗', 'health', 'emerald', 6)" class="text-xs px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 transition">
+                            + 🥗 งดของหวาน
+                        </button>
+                    </div>
+                    <span id="totalHabitsFooter" class="text-xs text-slate-400 dark:text-slate-500">
+                        แสดงทั้งหมด 6 เป้าหมาย
+                    </span>
+                </div>
+            </section>
+
+            <!-- Right Column (4 cols): Interactive Weekly Charts & Streak Analytics -->
+            <section class="lg:col-span-4 space-y-6">
+
+                <!-- Chart Card 1: Weekly Completion Interactive Bar/Trend Chart -->
+                <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <i class="ph-fill ph-chart-line-up text-indigo-500 text-lg"></i>
+                                แผนภูมิการทำต่อเนื่องรายสัปดาห์
+                            </h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                อัตราความสำเร็จแต่ละวัน (จันทร์ - อาทิตย์)
+                            </p>
+                        </div>
+                        <!-- Chart Type Switcher -->
+                        <div class="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                            <button onclick="setChartMode('bar')" id="btnChartBar" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm transition">
+                                แท่ง
+                            </button>
+                            <button onclick="setChartMode('area')" id="btnChartArea" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 transition">
+                                เส้นแนวโน้ม
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Chart Container -->
+                    <div class="relative pt-4 pb-1">
+                        <!-- Target 80% Dashed Line Label -->
+                        <div class="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 mb-1">
+                            <span>เป้าหมายแนะนำ: 80%</span>
+                            <span id="chartHoverInfo" class="font-semibold text-indigo-600 dark:text-indigo-400">ชี้ที่กราฟเพื่อดูรายละเอียด</span>
+                        </div>
+
+                        <!-- Dynamic SVG/HTML Chart Wrapper -->
+                        <div id="weeklyChartWrapper" class="h-48 w-full relative flex items-end justify-between gap-2 pt-6 pb-6 px-2 bg-slate-50/70 dark:bg-slate-950/50 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Weekly Insight Box -->
+                    <div class="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-start gap-3">
+                        <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                            <i class="ph-fill ph-lightbulb text-base"></i>
+                        </div>
+                        <div class="text-xs space-y-0.5">
+                            <p class="font-semibold text-indigo-950 dark:text-indigo-200">สรุปวิเคราะห์รายสัปดาห์</p>
+                            <p id="weeklyInsightText" class="text-indigo-800/80 dark:text-indigo-300/80 leading-relaxed">
+                                กำลังประมวลผลข้อมูลความต่อเนื่องของคุณ...
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Card 2: Category Breakdown & Streak Ranking -->
+                <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <i class="ph-fill ph-chart-donut text-purple-500 text-lg"></i>
+                                สัดส่วนแยกตามหมวดหมู่
+                            </h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                ความสำเร็จสะสมในสัปดาห์นี้แยกตามด้าน
+                            </p>
+                        </div>
+                    </div>
+
+                    <div id="categoryBreakdownList" class="space-y-3 pt-1">
+                        <!-- Dynamically populated category progress bars -->
+                    </div>
+                </div>
+
+            </section>
+        </div>
+
+        <!-- Bottom Analytics Row: 28-Day Consistency Heatmap & Top Streak Leaderboard -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- 28-Day Consistency Heatmap (7 cols) -->
+            <div class="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                            <i class="ph-fill ph-fire text-orange-500 text-lg"></i>
+                            ตารางความสม่ำเสมอ 28 วันล่าสุด (Consistency Heatmap)
+                        </h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                            ยิ่งสีเข้ม ยิ่งแสดงถึงวันที่คุณทำเป้าหมายรายวันสำเร็จครบถ้วน
+                        </p>
+                    </div>
+                    <!-- Legend -->
+                    <div class="flex items-center gap-1.5 text-xs text-slate-400">
+                        <span>น้อย</span>
+                        <span class="w-3.5 h-3.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"></span>
+                        <span class="w-3.5 h-3.5 rounded bg-emerald-200 dark:bg-emerald-900/70"></span>
+                        <span class="w-3.5 h-3.5 rounded bg-emerald-400 dark:bg-emerald-700"></span>
+                        <span class="w-3.5 h-3.5 rounded bg-emerald-600 dark:bg-emerald-500"></span>
+                        <span>ครบ 100%</span>
+                    </div>
+                </div>
+
+                <!-- 4 Weeks x 7 Days Grid -->
+                <div id="heatmapGrid" class="grid grid-cols-7 gap-2 pt-1">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Streak Leaderboard per Habit (5 cols) -->
+            <div class="lg:col-span-5 bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                            <i class="ph-fill ph-medal text-amber-500 text-lg"></i>
+                            อันดับนิสัยที่ทำต่อเนื่องสูงสุด
+                        </h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                            เปรียบเทียบสถิติปัจจุบัน (Streak) กับเป้าหมายรายสัปดาห์
+                        </p>
+                    </div>
+                </div>
+
+                <div id="streakLeaderboard" class="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Add / Edit Habit Modal -->
+    <div id="habitModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-pop">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <h3 id="modalTitle" class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                    <i class="ph-fill ph-plus-circle text-indigo-500 text-xl"></i>
+                    เพิ่มเป้าหมายนิสัยใหม่
+                </h3>
+                <button onclick="closeHabitModal()" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <form id="habitForm" onsubmit="saveHabitForm(event)" class="space-y-4">
+                <input type="hidden" id="editHabitId" value="">
+
+                <!-- Habit Name -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                        ชื่อนิสัย / เป้าหมายรายวัน <span class="text-rose-500">*</span>
+                    </label>
+                    <input type="text" id="habitNameInput" required placeholder="เช่น วิ่งออกกำลังกาย 30 นาที, อ่านหนังสือ 1 บท"
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <!-- Icon & Category Row -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                            ไอคอนสัญลักษณ์
+                        </label>
+                        <select id="habitIconInput" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="🏃">🏃 ออกกำลังกาย</option>
+                            <option value="📖">📖 อ่านหนังสือ</option>
+                            <option value="💧">💧 ดื่มน้ำสะอาด</option>
+                            <option value="🧘">🧘 นั่งสมาธิ</option>
+                            <option value="💰">💰 ออมเงิน/จดบัญชี</option>
+                            <option value="🥗">🥗 ทานอาหารคลีน</option>
+                            <option value="💻">💻 เขียนโค้ด/เรียนเสริม</option>
+                            <option value="😴">😴 นอนก่อน 4 ทุ่ม</option>
+                            <option value="🇬🇧">🇬🇧 ฝึกภาษา</option>
+                            <option value="✍️">✍️ จดบันทึกขอบคุณ</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                            หมวดหมู่
+                        </label>
+                        <select id="habitCategoryInput" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="health">💪 สุขภาพ</option>
+                            <option value="work">📚 การงาน/พัฒนาตนเอง</option>
+                            <option value="mind">🧘 จิตใจ/สมาธิ</option>
+                            <option value="finance">💰 การเงิน</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Target Days per week & Theme Color -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                            เป้าหมายต่อสัปดาห์
+                        </label>
+                        <select id="habitTargetInput" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="7">ทุกวัน (7 วัน/สัปดาห์)</option>
+                            <option value="6">6 วัน/สัปดาห์</option>
+                            <option value="5" selected>5 วัน/สัปดาห์</option>
+                            <option value="4">4 วัน/สัปดาห์</option>
+                            <option value="3">3 วัน/สัปดาห์</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                            โทนสีป้ายกำกับ
+                        </label>
+                        <select id="habitColorInput" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="emerald">🟢 เขียว (Emerald)</option>
+                            <option value="indigo">🟣 คราม (Indigo)</option>
+                            <option value="rose">🔴 ชมพู (Rose)</option>
+                            <option value="amber">🟠 ส้มทอง (Amber)</option>
+                            <option value="sky">🔵 ฟ้า (Sky)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" onclick="closeHabitModal()" class="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20 transition">
+                        บันทึกเป้าหมาย
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Thai Day Labels (Monday = 0 ... Sunday = 6)
+        const DAYS_SHORT = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
+        const DAYS_FULL = ['วันจันทร์', 'วันอังคาร', 'วันพุธ', 'วันพฤหัสบดี', 'วันศุกร์', 'วันเสาร์', 'วันอาทิตย์'];
+        const WEEK_DATES = {
+            '0': ['12 ต.ค.', '13 ต.ค.', '14 ต.ค.', '15 ต.ค.', '16 ต.ค.', '17 ต.ค.', '18 ต.ค.'],
+            '-1': ['5 ต.ค.', '6 ต.ค.', '7 ต.ค.', '8 ต.ค.', '9 ต.ค.', '10 ต.ค.', '11 ต.ค.']
+        };
+
+        const CATEGORIES = {
+            health: { name: 'สุขภาพ', icon: '💪', badgeClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300', barColor: 'bg-emerald-500' },
+            work: { name: 'การงาน/พัฒนาตนเอง', icon: '📚', badgeClass: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300', barColor: 'bg-indigo-500' },
+            mind: { name: 'จิตใจ/สมาธิ', icon: '🧘', badgeClass: 'bg-purple-100 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300', barColor: 'bg-purple-500' },
+            finance: { name: 'การเงิน', icon: '💰', badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300', barColor: 'bg-amber-500' }
+        };
+
+        const COLOR_STYLES = {
+            emerald: { activeBg: 'bg-emerald-500 border-emerald-500 text-white shadow-emerald-500/30', lightBg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' },
+            indigo: { activeBg: 'bg-indigo-500 border-indigo-500 text-white shadow-indigo-500/30', lightBg: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400' },
+            rose: { activeBg: 'bg-rose-500 border-rose-500 text-white shadow-rose-500/30', lightBg: 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400' },
+            amber: { activeBg: 'bg-amber-500 border-amber-500 text-white shadow-amber-500/30', lightBg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400' },
+            sky: { activeBg: 'bg-sky-500 border-sky-500 text-white shadow-sky-500/30', lightBg: 'bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400' }
+        };
+
+        // Application State
+        let state = {
+            activeDayIndex: 2, // Default Wednesday (วันพุธ)
+            weekOffset: 0,     // 0 = current week, -1 = previous week
+            categoryFilter: 'all',
+            chartMode: 'bar',  // 'bar' | 'area'
+            soundEnabled: true,
+            habits: []
+        };
+
+        // Default rich Thai habits with realistic current & previous week completion
+        function getDefaultHabits() {
+            return [
+                {
+                    id: 'h1',
+                    name: 'ออกกำลังกาย / วิ่งจ๊อกกิ้ง 30 นาที',
+                    icon: '🏃',
+                    category: 'health',
+                    color: 'emerald',
+                    targetPerWeek: 5,
+                    baseStreak: 9,
+                    weeks: {
+                        '0': [true, true, true, false, true, false, false],
+                        '-1': [true, true, true, true, true, false, true]
+                    }
+                },
+                {
+                    id: 'h2',
+                    name: 'อ่านหนังสือพัฒนาตัวเอง 20 หน้า',
+                    icon: '📖',
+                    category: 'work',
+                    color: 'indigo',
+                    targetPerWeek: 6,
+                    baseStreak: 12,
+                    weeks: {
+                        '0': [true, true, true, true, false, true, false],
+                        '-1': [true, true, true, true, true, true, true]
+                    }
+                },
+                {
+                    id: 'h3',
+                    name: 'ดื่มน้ำสะอาดครบ 8 แก้ว (2 ลิตร)',
+                    icon: '💧',
+                    category: 'health',
+                    color: 'sky',
+                    targetPerWeek: 7,
+                    baseStreak: 18,
+                    weeks: {
+                        '0': [true, true, true, true, true, true, false],
+                        '-1': [true, true, true, true, true, true, true]
+                    }
+                },
+                {
+                    id: 'h4',
+                    name: 'ฝึกสติและทำสมาธิก่อนนอน 15 นาที',
+                    icon: '🧘',
+                    category: 'mind',
+                    color: 'rose',
+                    targetPerWeek: 7,
+                    baseStreak: 5,
+                    weeks: {
+                        '0': [true, false, true, true, false, false, false],
+                        '-1': [true, true, false, true, true, true, true]
+                    }
+                },
+                {
+                    id: 'h5',
+                    name: 'จดบันทึกรายรับ-รายจ่ายประจำวัน',
+                    icon: '💰',
+                    category: 'finance',
+                    color: 'amber',
+                    targetPerWeek: 7,
+                    baseStreak: 14,
+                    weeks: {
+                        '0': [true, true, true, true, true, false, false],
+                        '-1': [true, true, true, true, true, true, true]
+                    }
+                },
+                {
+                    id: 'h6',
+                    name: 'ทบทวนเป้าหมายและวางแผนงานวันถัดไป',
+                    icon: '💻',
+                    category: 'work',
+                    color: 'indigo',
+                    targetPerWeek: 5,
+                    baseStreak: 6,
+                    weeks: {
+                        '0': [true, true, false, true, true, false, false],
+                        '-1': [true, true, true, true, true, false, false]
+                    }
+                }
+            ];
+        }
+
+        // Subtle Web Audio API synthesizer for satisfying UI sounds
+        let audioCtx = null;
+        function playSound(type = 'check') {
+            if (!state.soundEnabled) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+                if (type === 'check') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+                    osc.start(now);
+                    osc.stop(now + 0.14);
+                } else if (type === 'uncheck') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(260, now + 0.1);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+                    osc.start(now);
+                    osc.stop(now + 0.11);
+                } else if (type === 'celebrate') {
+                    [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.type = 'triangle';
+                        o.frequency.setValueAtTime(freq, now + idx * 0.07);
+                        g.gain.setValueAtTime(0.12, now + idx * 0.07);
+                        g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.07 + 0.25);
+                        o.start(now + idx * 0.07);
+                        o.stop(now + idx * 0.07 + 0.25);
+                    });
+                }
+            } catch (err) {
+                // Ignore audio errors if blocked by browser autoplay policy
+            }
+        }
+
+        // Load & Save from LocalStorage
+        function loadState() {
+            try {
+                const saved = localStorage.getItem('habitflow_thai_v1');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        state.habits = parsed;
+                        return;
+                    }
+                }
+            } catch (e) {}
+            state.habits = getDefaultHabits();
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem('habitflow_thai_v1', JSON.stringify(state.habits));
+            } catch (e) {}
+        }
+
+        // Calculate continuous streak up to activeDayIndex
+        function calculateHabitStreak(habit) {
+            const currWeek = habit.weeks['0'] || [false, false, false, false, false, false, false];
+            const prevWeek = habit.weeks['-1'] || [false, false, false, false, false, false, false];
+            let streak = 0;
+
+            // Count backwards from activeDayIndex in current week
+            for (let d = state.activeDayIndex; d >= 0; d--) {
+                if (currWeek[d]) {
+                    streak++;
+                } else {
+                    // If today isn't checked yet, check if yesterday had an active streak
+                    if (d === state.activeDayIndex) continue;
+                    return streak;
+                }
+            }
+
+            // If all days up to Monday in current week are completed, add previous week consecutive days
+            for (let d = 6; d >= 0; d--) {
+                if (prevWeek[d]) {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+
+            // Add historical baseStreak if previous week was also strong
+            if (streak >= (state.activeDayIndex + 5)) {
+                streak += (habit.baseStreak || 3);
+            }
+            return streak;
+        }
+
+        // Get active week array for a habit
+        function getWeekArray(habit, weekKey = String(state.weekOffset)) {
+            if (!habit.weeks[weekKey]) {
+                habit.weeks[weekKey] = [false, false, false, false, false, false, false];
+            }
+            return habit.weeks[weekKey];
+        }
+
+        function renderHabitTable() {
+            const headerRow = document.getElementById('habitTableHeaderRow');
+            const tbody = document.getElementById('habitTableBody');
+            const dates = WEEK_DATES[String(state.weekOffset)];
+
+            // Render Header Row
+            let headerHTML = `
+                <th class="py-3.5 pl-6 pr-3 w-[270px]">เป้าหมายนิสัยรายวัน</th>
+            `;
+            for (let d = 0; d < 7; d++) {
+                const isToday = (state.weekOffset === 0 && d === state.activeDayIndex);
+                headerHTML += `
+                    <th class="py-3 px-1.5 text-center w-14 ${isToday ? 'bg-indigo-50/90 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400' : ''}">
+                        <div class="flex flex-col items-center">
+                            <span class="text-xs font-bold">${DAYS_SHORT[d]}</span>
+                            <span class="text-[10px] font-normal opacity-75">${dates[d]}</span>
+                            ${isToday ? '<span class="mt-0.5 px-1.5 py-0.2 rounded-full text-[9px] bg-indigo-600 text-white">วันนี้</span>' : ''}
+                        </div>
+                    </th>
+                `;
+            }
+            headerHTML += `
+                <th class="py-3.5 px-3 text-center w-24">ต่อเนื่อง</th>
+                <th class="py-3.5 px-3 text-center w-28">เป้าหมายสัปดาห์</th>
+                <th class="py-3.5 pr-5 pl-2 text-right w-20">จัดการ</th>
+            `;
+            headerRow.innerHTML = headerHTML;
+
+            // Filter habits
+            const filtered = state.habits.filter(h => state.categoryFilter === 'all' || h.category === state.categoryFilter);
+            document.getElementById('totalHabitsFooter').textContent = `แสดง ${filtered.length} จาก ${state.habits.length} เป้าหมาย`;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="11" class="py-12 text-center text-slate-400 dark:text-slate-500">
+                            <div class="flex flex-col items-center gap-2">
+                                <i class="ph-duotone ph-clipboard-text text-4xl text-slate-300 dark:text-slate-700"></i>
+                                <p class="text-sm font-medium">ยังไม่มีเป้าหมายนิสัยในหมวดหมู่นี้</p>
+                                <button onclick="openHabitModal()" class="mt-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                                    + คลิกเพื่อเพิ่มเป้าหมายใหม่
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // Render Rows
+            tbody.innerHTML = filtered.map(habit => {
+                const weekArr = getWeekArray(habit);
+                const doneCount = weekArr.filter(Boolean).length;
+                const target = habit.targetPerWeek || 7;
+                const progressPct = Math.min(100, Math.round((doneCount / target) * 100));
+                const streak = calculateHabitStreak(habit);
+                const catInfo = CATEGORIES[habit.category] || CATEGORIES.health;
+                const colorStyle = COLOR_STYLES[habit.color] || COLOR_STYLES.indigo;
+
+                let dayCellsHTML = '';
+                for (let d = 0; d < 7; d++) {
+                    const isChecked = weekArr[d];
+                    const isToday = (state.weekOffset === 0 && d === state.activeDayIndex);
+                    const cellHighlight = isToday ? 'bg-indigo-50/40 dark:bg-indigo-950/25' : '';
+                    const btnClasses = isChecked
+                        ? `${colorStyle.activeBg} shadow-md`
+                        : `bg-slate-100 dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-transparent hover:border-indigo-400 dark:hover:border-indigo-500`;
+
+                    dayCellsHTML += `
+                        <td class="p-1.5 text-center ${cellHighlight}">
+                            <button onclick="toggleHabitDay('${habit.id}', ${d}, this)"
+                                title="${habit.name} - ${DAYS_FULL[d]}"
+                                class="w-9 h-9 rounded-xl border transition-all duration-200 inline-flex items-center justify-center ${btnClasses}">
+                                <i class="ph-bold ph-check text-base ${isChecked ? 'scale-100' : 'scale-0'} transition-transform"></i>
+                            </button>
+                        </td>
+                    `;
+                }
+
+                return `
+                    <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition group">
+                        <td class="py-3.5 pl-6 pr-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-2xl ${colorStyle.lightBg} flex items-center justify-center text-xl shrink-0">
+                                    ${habit.icon}
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="font-semibold text-slate-800 dark:text-slate-100 truncate text-sm">${habit.name}</p>
+                                    <div class="flex items-center gap-1.5 mt-0.5">
+                                        <span class="text-[10px] font-medium px-2 py-0.2 rounded-md ${catInfo.badgeClass}">
+                                            ${catInfo.name}
+                                        </span>
+                                        <span class="text-[11px] text-slate-400 dark:text-slate-500">
+                                            เป้า ${target} วัน/สัปดาห์
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        ${dayCellsHTML}
+                        <td class="py-3.5 px-3 text-center">
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold font-num ${streak > 0 ? 'bg-orange-50 text-orange-600 dark:bg-orange-950/60 dark:text-orange-400 border border-orange-200/60 dark:border-orange-800/40' : 'text-slate-400'}">
+                                🔥 ${streak} วัน
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-3">
+                            <div class="flex flex-col gap-1">
+                                <div class="flex items-center justify-between text-xs font-num">
+                                    <span class="font-bold ${doneCount >= target ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}">${doneCount}/${target}</span>
+                                    <span class="text-[11px] text-slate-400">${progressPct}%</span>
+                                </div>
+                                <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full transition-all duration-500 ${doneCount >= target ? 'bg-emerald-500' : 'bg-indigo-500'}" style="width: ${progressPct}%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3.5 pr-5 pl-2 text-right">
+                            <div class="flex items-center justify-end gap-1 opacity-80 group-hover:opacity-100">
+                                <button onclick="openHabitModal('${habit.id}')" title="แก้ไข" class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition">
+                                    <i class="ph-bold ph-pencil-simple text-sm"></i>
+                                </button>
+                                <button onclick="deleteHabit('${habit.id}')" title="ลบ" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 transition">
+                                    <i class="ph-bold ph-trash text-sm"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateKPIs() {
+            const totalHabits = state.habits.length;
+            let todayCompleted = 0;
+            let bestStreak = 0;
+            let bestStreakHabitName = 'ยังไม่มีสถิติ';
+            let weeklyDoneTotal = 0;
+            let weeklyTargetTotal = 0;
+            let perfectDaysCount = 0;
+
+            // Count today's completion & streaks
+            state.habits.forEach(h => {
+                const weekArr = getWeekArray(h);
+                if (weekArr[state.activeDayIndex]) todayCompleted++;
+
+                const s = calculateHabitStreak(h);
+                if (s > bestStreak) {
+                    bestStreak = s;
+                    bestStreakHabitName = `${h.icon} ${h.name}`;
+                }
+
+                weeklyDoneTotal += weekArr.filter(Boolean).length;
+                weeklyTargetTotal += (h.targetPerWeek || 7);
+            });
+
+            // Count perfect days in current selected week
+            if (totalHabits > 0) {
+                for (let d = 0; d < 7; d++) {
+                    const allDoneOnDay = state.habits.every(h => getWeekArray(h)[d]);
+                    if (allDoneOnDay) perfectDaysCount++;
+                }
+            }
+
+            // Update Card 1: Today's Completion
+            const todayPct = totalHabits > 0 ? Math.round((todayCompleted / totalHabits) * 100) : 0;
+            document.getElementById('todayNameLabel').textContent = DAYS_FULL[state.activeDayIndex];
+            document.getElementById('kpiTodayCount').textContent = `${todayCompleted}/${totalHabits}`;
+            document.getElementById('kpiTodayPercent').textContent = `${todayPct}%`;
+
+            const circumference = 163.36;
+            const offset = circumference - (todayPct / 100) * circumference;
+            document.getElementById('todayRingCircle').style.strokeDashoffset = offset;
+
+            const subtextEl = document.getElementById('kpiTodaySubtext');
+            if (todayPct === 100 && totalHabits > 0) {
+                subtextEl.textContent = '🎉 ยอดเยี่ยม! วันนี้ทำครบทุกเป้าหมายแล้ว';
+                subtextEl.className = 'text-xs font-medium text-emerald-600 dark:text-emerald-400 pt-1';
+            } else if (todayPct >= 50) {
+                subtextEl.textContent = `เหลืออีก ${totalHabits - todayCompleted} เป้าหมายจะครบวันนี้!`;
+                subtextEl.className = 'text-xs text-slate-500 dark:text-slate-400 pt-1';
+            } else {
+                subtextEl.textContent = 'เริ่มต้นเช็คเป้าหมายของวันนี้กันเลย!';
+                subtextEl.className = 'text-xs text-slate-500 dark:text-slate-400 pt-1';
+            }
+
+            // Update Card 2: Best Streak
+            document.getElementById('kpiBestStreak').textContent = bestStreak;
+            document.getElementById('kpiBestStreakHabit').textContent = bestStreakHabitName;
+
+            // Update Card 3: Weekly Completion Rate
+            const maxPossibleSlots = totalHabits * 7;
+            const weeklyRate = maxPossibleSlots > 0 ? Math.round((weeklyDoneTotal / maxPossibleSlots) * 100) : 0;
+            document.getElementById('kpiWeeklyRate').textContent = `${weeklyRate}%`;
+            document.getElementById('kpiWeeklyFraction').textContent = `(${weeklyDoneTotal}/${maxPossibleSlots} ครั้ง)`;
+            document.getElementById('kpiWeeklyBar').style.width = `${weeklyRate}%`;
+
+            // Update Card 4: Perfect Days & XP
+            document.getElementById('kpiPerfectDays').textContent = perfectDaysCount;
+            const totalXP = (weeklyDoneTotal * 25) + (bestStreak * 15) + (perfectDaysCount * 50);
+            document.getElementById('kpiScoreText').innerHTML = `คะแนนวินัยสะสม: <strong class="text-indigo-600 dark:text-indigo-400 font-num">${totalXP.toLocaleString()} XP</strong>`;
+
+            const level = Math.max(1, Math.floor(totalXP / 250) + 1);
+            const levelTitles = ['ผู้เริ่มต้น', 'นักฝึกฝน', 'ผู้มุ่งมั่น', 'นักสร้างวินัย', 'ปรมาจารย์นิสัย', 'ตำนานไร้พ่าย'];
+            const title = levelTitles[Math.min(level - 1, levelTitles.length - 1)];
+            document.getElementById('userLevelBadge').textContent = `🌟 เลเวล ${level} ${title}`;
+        }
+
+        function renderWeeklyChart() {
+            const wrapper = document.getElementById('weeklyChartWrapper');
+            const totalHabits = state.habits.length || 1;
+            const dates = WEEK_DATES[String(state.weekOffset)];
+
+            // Compute daily stats for Monday (0) - Sunday (6)
+            const dailyStats = [];
+            for (let d = 0; d < 7; d++) {
+                let done = 0;
+                state.habits.forEach(h => {
+                    if (getWeekArray(h)[d]) done++;
+                });
+                const pct = state.habits.length > 0 ? Math.round((done / totalHabits) * 100) : 0;
+                dailyStats.push({
+                    dayShort: DAYS_SHORT[d],
+                    dayFull: DAYS_FULL[d],
+                    date: dates[d],
+                    done,
+                    total: state.habits.length,
+                    pct
+                });
+            }
+
+            // Target 80% horizontal guide line
+            const guideLineHTML = `
+                <div class="absolute left-2 right-2 border-t border-dashed border-emerald-400/70 dark:border-emerald-500/50 pointer-events-none z-0" style="bottom: calc(1.5rem + 72%);"></div>
+            `;
+
+            if (state.chartMode === 'bar') {
+                const barsHTML = dailyStats.map((st, idx) => {
+                    const isToday = (state.weekOffset === 0 && idx === state.activeDayIndex);
+                    const barColor = st.pct >= 80
+                        ? 'from-emerald-500 to-teal-400'
+                        : st.pct >= 50
+                            ? 'from-indigo-500 to-purple-500'
+                            : 'from-amber-500 to-orange-400';
+
+                    return `
+                        <div class="flex-1 flex flex-col items-center h-full justify-end z-10 group cursor-pointer"
+                            onmouseenter="showChartHover('${st.dayFull} (${st.date}): สำเร็จ ${st.done}/${st.total} เป้าหมาย (${st.pct}%)')">
+                            <span class="text-[10px] font-bold font-num mb-1 ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-400'}">
+                                ${st.pct}%
+                            </span>
+                            <div class="w-full max-w-[30px] h-28 bg-slate-200/70 dark:bg-slate-800 rounded-xl p-0.5 flex items-end overflow-hidden">
+                                <div class="w-full rounded-lg bg-gradient-to-t ${barColor} transition-all duration-500 group-hover:brightness-110"
+                                    style="height: ${Math.max(st.pct, 6)}%"></div>
+                            </div>
+                            <span class="mt-2 text-xs font-semibold ${isToday ? 'text-indigo-600 dark:text-indigo-400 underline decoration-2 underline-offset-4' : 'text-slate-600 dark:text-slate-400'}">
+                                ${st.dayShort}
+                            </span>
+                        </div>
+                    `;
+                }).join('');
+
+                wrapper.innerHTML = guideLineHTML + barsHTML;
+            } else {
+                // SVG Area Trend Line Mode
+                const width = 320;
+                const height = 115;
+                const points = dailyStats.map((st, idx) => {
+                    const x = 20 + (idx * ((width - 40) / 6));
+                    const y = height - 15 - ((st.pct / 100) * (height - 30));
+                    return { x, y, st, idx };
+                });
+
+                const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
+                const areaPoints = `${points[0].x},${height - 15} ${polylinePoints} ${points[points.length - 1].x},${height - 15}`;
+
+                const circlesHTML = points.map(p => `
+                    <g class="cursor-pointer" onmouseenter="showChartHover('${p.st.dayFull} (${p.st.date}): สำเร็จ ${p.st.done}/${p.st.total} เป้าหมาย (${p.st.pct}%)')">
+                        <circle cx="${p.x}" cy="${p.y}" r="6" class="fill-indigo-600 dark:fill-indigo-400 stroke-white dark:stroke-slate-900" stroke-width="2.5"></circle>
+                        <text x="${p.x}" y="${p.y - 10}" text-anchor="middle" class="fill-slate-600 dark:fill-slate-300 text-[9px] font-bold font-num">${p.st.pct}%</text>
+                        <text x="${p.x}" y="${height - 2}" text-anchor="middle" class="fill-slate-500 dark:fill-slate-400 text-[10px] font-semibold">${p.st.dayShort}</text>
+                    </g>
+                `).join('');
+
+                wrapper.innerHTML = `
+                    <svg viewBox="0 0 ${width} ${height}" class="w-full h-full overflow-visible">
+                        <defs>
+                            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#6366f1" stop-opacity="0.45"/>
+                                <stop offset="100%" stop-color="#6366f1" stop-opacity="0.0"/>
+                            </linearGradient>
+                        </defs>
+                        <polygon points="${areaPoints}" fill="url(#areaGrad)" />
+                        <polyline fill="none" stroke="#6366f1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${polylinePoints}" />
+                        ${circlesHTML}
+                    </svg>
+                `;
+            }
+
+            // Update Smart Insight Text
+            const sortedByPct = [...dailyStats].sort((a, b) => b.pct - a.pct);
+            const bestDay = sortedByPct[0];
+            const avgPct = Math.round(dailyStats.reduce((acc, c) => acc + c.pct, 0) / 7);
+            const insightEl = document.getElementById('weeklyInsightText');
+
+            if (avgPct >= 80) {
+                insightEl.textContent = `สัปดาห์นี้คุณมีวินัยยอดเยี่ยมมาก! ค่าเฉลี่ยอยู่ที่ ${avgPct}% โดยเฉพาะ${bestDay.dayFull}ที่ทำสำเร็จถึง ${bestDay.pct}% รักษามาตรฐานนี้ไว้ได้เลย`;
+            } else if (avgPct >= 50) {
+                insightEl.textContent = `คุณทำได้ดีใน${bestDay.dayFull} (${bestDay.pct}%) ภาพรวมสัปดาห์นี้อยู่ที่ ${avgPct}% ลองเก็บเป้าหมายเพิ่มอีกวันละ 1-2 ข้อเพื่อดันกราฟแตะระดับ 80%!`;
+            } else {
+                insightEl.textContent = `เริ่มต้นสัปดาห์ด้วยการโฟกัสนิสัยที่ทำง่ายที่สุดก่อน! ปัจจุบันค่าเฉลี่ยอยู่ที่ ${avgPct}% การเช็คต่อเนื่องเพียงวันละนิดจะช่วยสร้าง Streak ที่มั่นคง`;
+            }
+        }
+
+        function showChartHover(text) {
+            document.getElementById('chartHoverInfo').textContent = text;
+        }
+
+        function renderAnalyticsPanels() {
+            // 1. Category Breakdown
+            const catContainer = document.getElementById('categoryBreakdownList');
+            const catKeys = Object.keys(CATEGORIES);
+
+            catContainer.innerHTML = catKeys.map(key => {
+                const catHabits = state.habits.filter(h => h.category === key);
+                const info = CATEGORIES[key];
+                if (catHabits.length === 0) {
+                    return `
+                        <div class="space-y-1 opacity-50">
+                            <div class="flex justify-between text-xs">
+                                <span>${info.icon} ${info.name} (0 เป้าหมาย)</span>
+                                <span class="font-num">0%</span>
+                            </div>
+                            <div class="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full"></div>
+                        </div>
+                    `;
+                }
+
+                let done = 0;
+                let totalPossible = catHabits.length * 7;
+                catHabits.forEach(h => {
+                    done += getWeekArray(h).filter(Boolean).length;
+                });
+                const pct = Math.round((done / totalPossible) * 100);
+
+                return `
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-medium text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                                <span>${info.icon}</span> ${info.name}
+                                <span class="text-[11px] text-slate-400">(${catHabits.length} นิสัย)</span>
+                            </span>
+                            <span class="font-bold font-num text-slate-700 dark:text-slate-200">${pct}% <span class="text-[11px] font-normal text-slate-400">(${done}/${totalPossible})</span></span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div class="${info.barColor} h-full rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // 2. 28-Day Consistency Heatmap (2 weeks historical + previous week + current week)
+            const heatmapEl = document.getElementById('heatmapGrid');
+            const totalHabits = state.habits.length || 1;
+            const cells = [];
+
+            // Generate 28 days
+            const historicalRates = [0.65, 0.85, 1.0, 0.8, 0.5, 0.9, 1.0, 0.7, 0.85, 1.0, 1.0, 0.6, 0.4, 0.85];
+            for (let i = 0; i < 14; i++) {
+                const pct = Math.round(historicalRates[i] * 100);
+                cells.push({ label: `วันที่ ${i + 1} (เดือนก่อน)`, pct });
+            }
+            // Week -1
+            for (let d = 0; d < 7; d++) {
+                let done = 0;
+                state.habits.forEach(h => { if (getWeekArray(h, '-1')[d]) done++; });
+                const pct = Math.round((done / totalHabits) * 100);
+                cells.push({ label: `สัปดาห์ก่อน ${DAYS_FULL[d]} (${WEEK_DATES['-1'][d]})`, pct });
+            }
+            // Week 0 (Current)
+            for (let d = 0; d < 7; d++) {
+                let done = 0;
+                state.habits.forEach(h => { if (getWeekArray(h, '0')[d]) done++; });
+                const pct = Math.round((done / totalHabits) * 100);
+                cells.push({ label: `สัปดาห์นี้ ${DAYS_FULL[d]} (${WEEK_DATES['0'][d]})`, pct, isCurrentWeek: true, isToday: d === state.activeDayIndex });
+            }
+
+            heatmapEl.innerHTML = cells.map(c => {
+                let bgClass = 'bg-slate-100 dark:bg-slate-800 text-slate-400';
+                if (c.pct === 100) bgClass = 'bg-emerald-600 dark:bg-emerald-500 text-white shadow-sm shadow-emerald-500/20';
+                else if (c.pct >= 65) bgClass = 'bg-emerald-400 dark:bg-emerald-700 text-emerald-950 dark:text-white';
+                else if (c.pct > 0) bgClass = 'bg-emerald-200 dark:bg-emerald-900/70 text-emerald-900 dark:text-emerald-200';
+
+                const ringClass = c.isToday ? 'ring-2 ring-indigo-600 dark:ring-indigo-400 ring-offset-2 dark:ring-offset-slate-900' : '';
+
+                return `
+                    <div title="${c.label}: สำเร็จ ${c.pct}%"
+                        class="h-10 rounded-xl ${bgClass} ${ringClass} flex flex-col items-center justify-center text-[11px] font-bold font-num transition hover:scale-105 cursor-default">
+                        <span>${c.pct}%</span>
+                    </div>
+                `;
+            }).join('');
+
+            // 3. Streak Leaderboard
+            const leaderboardEl = document.getElementById('streakLeaderboard');
+            const ranked = [...state.habits].map(h => ({
+                ...h,
+                streak: calculateHabitStreak(h),
+                weeklyDone: getWeekArray(h).filter(Boolean).length
+            })).sort((a, b) => b.streak - a.streak);
+
+            leaderboardEl.innerHTML = ranked.map((h, idx) => {
+                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+                return `
+                    <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span class="text-sm font-bold w-6 text-center">${medal}</span>
+                            <span class="text-lg">${h.icon}</span>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">${h.name}</p>
+                                <p class="text-[11px] text-slate-400">สัปดาห์นี้: ${h.weeklyDone}/${h.targetPerWeek} วัน</p>
+                            </div>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-xl bg-orange-100/80 dark:bg-orange-950/80 text-orange-600 dark:text-orange-400 text-xs font-bold font-num shrink-0">
+                            🔥 ${h.streak} วัน
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderAll() {
+            renderHabitTable();
+            updateKPIs();
+            renderWeeklyChart();
+            renderAnalyticsPanels();
+            saveState();
+        }
+
+        // Toggle completion for a specific habit and day
+        function toggleHabitDay(habitId, dayIdx, btnEl) {
+            const habit = state.habits.find(h => h.id === habitId);
+            if (!habit) return;
+
+            const weekArr = getWeekArray(habit);
+            weekArr[dayIdx] = !weekArr[dayIdx];
+            const isNowChecked = weekArr[dayIdx];
+
+            if (btnEl) {
+                btnEl.classList.add('animate-pop');
+            }
+
+            playSound(isNowChecked ? 'check' : 'uncheck');
+            renderAll();
+
+            // Check if all habits for activeDayIndex are now 100% completed
+            if (isNowChecked && dayIdx === state.activeDayIndex && state.weekOffset === 0) {
+                const allDoneToday = state.habits.length > 0 && state.habits.every(h => getWeekArray(h)[state.activeDayIndex]);
+                if (allDoneToday) {
+                    playSound('celebrate');
+                    launchConfetti();
+                    showToast('🎉 ยอดเยี่ยมมาก! คุณทำเป้าหมายของวันนี้ครบ 100% แล้ว!', 'emerald');
+                }
+            }
+        }
+
+        // Check all habits for active day
+        function checkAllToday() {
+            let changed = false;
+            state.habits.forEach(h => {
+                const weekArr = getWeekArray(h);
+                if (!weekArr[state.activeDayIndex]) {
+                    weekArr[state.activeDayIndex] = true;
+                    changed = true;
+                }
+            });
+            if (changed) {
+                playSound('celebrate');
+                launchConfetti();
+                renderAll();
+                showToast(`เช็คเป้าหมายครบทุกข้อสำหรับ${DAYS_FULL[state.activeDayIndex]}แล้ว!`, 'emerald');
+            } else {
+                showToast('เป้าหมายของวันนี้ถูกเช็คครบทุกข้ออยู่แล้ว', 'indigo');
+            }
+        }
+
+        // Switch Week (Current vs Previous)
+        function changeWeekOffset(offset) {
+            state.weekOffset = offset;
+            const btnPrev = document.getElementById('btnPrevWeek');
+            const btnCurr = document.getElementById('btnCurrWeek');
+            const weekLabel = document.getElementById('weekLabel');
+
+            if (offset === -1) {
+                weekLabel.textContent = '5 - 11 ต.ค.';
+                btnPrev.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm transition flex items-center gap-1';
+                btnCurr.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition';
+            } else {
+                weekLabel.textContent = '12 - 18 ต.ค.';
+                btnCurr.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm transition';
+                btnPrev.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition flex items-center gap-1';
+            }
+            renderAll();
+        }
+
+        // Change Active Day ("Today")
+        function changeActiveDay(val) {
+            state.activeDayIndex = parseInt(val, 10);
+            renderAll();
+        }
+
+        // Filter by category
+        function setCategoryFilter(cat) {
+            state.categoryFilter = cat;
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                if (btn.dataset.cat === cat) {
+                    btn.className = 'cat-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-indigo-600 text-white shadow-sm transition whitespace-nowrap';
+                } else {
+                    btn.className = 'cat-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition whitespace-nowrap';
+                }
+            });
+            renderHabitTable();
+        }
+
+        // Switch Chart Mode
+        function setChartMode(mode) {
+            state.chartMode = mode;
+            const btnBar = document.getElementById('btnChartBar');
+            const btnArea = document.getElementById('btnChartArea');
+            if (mode === 'bar') {
+                btnBar.className = 'px-2.5 py-1 rounded-lg text-xs font-medium bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm transition';
+                btnArea.className = 'px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 transition';
+            } else {
+                btnArea.className = 'px-2.5 py-1 rounded-lg text-xs font-medium bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-sm transition';
+                btnBar.className = 'px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 transition';
+            }
+            renderWeeklyChart();
+        }
+
+        // Open Add/Edit Modal
+        function openHabitModal(habitId = null) {
+            const modal = document.getElementById('habitModal');
+            const titleEl = document.getElementById('modalTitle');
+            const editIdInput = document.getElementById('editHabitId');
+
+            if (habitId) {
+                const habit = state.habits.find(h => h.id === habitId);
+                if (!habit) return;
+                titleEl.innerHTML = `<i class="ph-fill ph-pencil-circle text-indigo-500 text-xl"></i> แก้ไขเป้าหมายนิสัย`;
+                editIdInput.value = habit.id;
+                document.getElementById('habitNameInput').value = habit.name;
+                document.getElementById('habitIconInput').value = habit.icon;
+                document.getElementById('habitCategoryInput').value = habit.category;
+                document.getElementById('habitTargetInput').value = habit.targetPerWeek;
+                document.getElementById('habitColorInput').value = habit.color;
+            } else {
+                titleEl.innerHTML = `<i class="ph-fill ph-plus-circle text-indigo-500 text-xl"></i> เพิ่มเป้าหมายนิสัยใหม่`;
+                editIdInput.value = '';
+                document.getElementById('habitForm').reset();
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => document.getElementById('habitNameInput').focus(), 50);
+        }
+
+        function closeHabitModal() {
+            const modal = document.getElementById('habitModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function saveHabitForm(e) {
+            e.preventDefault();
+            const editId = document.getElementById('editHabitId').value;
+            const name = document.getElementById('habitNameInput').value.trim();
+            const icon = document.getElementById('habitIconInput').value;
+            const category = document.getElementById('habitCategoryInput').value;
+            const targetPerWeek = parseInt(document.getElementById('habitTargetInput').value, 10);
+            const color = document.getElementById('habitColorInput').value;
+
+            if (!name) return;
+
+            if (editId) {
+                const habit = state.habits.find(h => h.id === editId);
+                if (habit) {
+                    habit.name = name;
+                    habit.icon = icon;
+                    habit.category = category;
+                    habit.targetPerWeek = targetPerWeek;
+                    habit.color = color;
+                    showToast(`อัปเดตเป้าหมาย "${name}" เรียบร้อยแล้ว`, 'indigo');
+                }
+            } else {
+                const newHabit = {
+                    id: 'h_' + Date.now(),
+                    name,
+                    icon,
+                    category,
+                    color,
+                    targetPerWeek,
+                    baseStreak: 1,
+                    weeks: {
+                        '0': [false, false, false, false, false, false, false],
+                        '-1': [true, false, true, true, false, true, false]
+                    }
+                };
+                state.habits.unshift(newHabit);
+                showToast(`เพิ่มเป้าหมาย "${name}" สำเร็จ!`, 'emerald');
+            }
+
+            closeHabitModal();
+            playSound('check');
+            renderAll();
+        }
+
+        function quickAddPreset(name, icon, category, color, targetPerWeek) {
+            const exists = state.habits.some(h => h.name === name);
+            if (exists) {
+                showToast(`มีเป้าหมาย "${name}" อยู่ในตารางแล้ว`, 'amber');
+                return;
+            }
+            state.habits.push({
+                id: 'h_' + Date.now(),
+                name,
+                icon,
+                category,
+                color,
+                targetPerWeek,
+                baseStreak: 2,
+                weeks: {
+                    '0': [true, false, true, false, false, false, false],
+                    '-1': [true, true, false, true, true, false, true]
+                }
+            });
+            playSound('check');
+            renderAll();
+            showToast(`เพิ่ม "${icon} ${name}" ลงในตารางแล้ว!`, 'emerald');
+        }
+
+        function deleteHabit(habitId) {
+            const habit = state.habits.find(h => h.id === habitId);
+            if (!habit) return;
+            state.habits = state.habits.filter(h => h.id !== habitId);
+            playSound('uncheck');
+            renderAll();
+            showToast(`ลบเป้าหมาย "${habit.name}" แล้ว`, 'rose');
+        }
+
+        function resetDemoData() {
+            state.habits = getDefaultHabits();
+            state.categoryFilter = 'all';
+            setCategoryFilter('all');
+            playSound('check');
+            renderAll();
+            showToast('รีเซ็ตข้อมูลตัวอย่างเริ่มต้นเรียบร้อยแล้ว', 'indigo');
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('themeIcon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.className = 'ph-fill ph-moon text-lg';
+            } else {
+                html.classList.add('dark');
+                icon.className = 'ph-fill ph-sun text-lg text-amber-400';
+            }
+        }
+
+        function toggleSound() {
+            state.soundEnabled = !state.soundEnabled;
+            const icon = document.getElementById('soundIcon');
+            icon.className = state.soundEnabled ? 'ph-fill ph-speaker-high text-lg' : 'ph-fill ph-speaker-slash text-lg text-rose-500';
+            showToast(state.soundEnabled ? 'เปิดเสียงเอฟเฟกต์แล้ว' : 'ปิดเสียงเอฟเฟกต์แล้ว', 'indigo');
+        }
+
+        function showToast(message, color = 'indigo') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const bgMap = {
+                emerald: 'bg-emerald-600 text-white',
+                indigo: 'bg-indigo-600 text-white',
+                rose: 'bg-rose-600 text-white',
+                amber: 'bg-amber-500 text-white'
+            };
+            toast.className = `pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-2xl shadow-xl text-xs font-medium ${bgMap[color] || bgMap.indigo} animate-pop transition-opacity duration-300`;
+            toast.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <i class="ph-fill ph-check-circle text-base"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 2800);
+        }
+
+        // Confetti Celebration Particle System
+        function launchConfetti() {
+            const canvas = document.getElementById('confettiCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const colors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#06b6d4'];
+            const particles = Array.from({ length: 70 }, () => ({
+                x: canvas.width / 2 + (Math.random() - 0.5) * 200,
+                y: canvas.height / 2,
+                vx: (Math.random() - 0.5) * 14,
+                vy: -Math.random() * 14 - 4,
+                size: Math.random() * 7 + 4,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                rot: Math.random() * 360,
+                vRot: (Math.random() - 0.5) * 12
+            }));
+
+            let frame = 0;
+            function animateConfetti() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.35; // gravity
+                    p.rot += p.vRot;
+
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate((p.rot * Math.PI) / 180);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                    ctx.restore();
+                });
+                frame++;
+                if (frame < 90) {
+                    requestAnimationFrame(animateConfetti);
+                } else {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+            animateConfetti();
+        }
+
+        // Initialize App on Load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            renderAll();
+        });
+    </script>
+</body>
+</html>
